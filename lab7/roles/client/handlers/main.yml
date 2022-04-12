@@ -1,0 +1,12 @@
+---
+- name: restart vip
+  ansible.builtin.systemd:
+    name: vip-manager
+    state: restarted
+    enabled: yes
+    
+- name: restart postgres
+  service: 
+    name: postgresql
+    state: restarted
+    enabled: yes
