@@ -10,7 +10,7 @@ The first thing we do is check the Vagrantfile and correct the data we need. Nex
 
 vagrant up
 
-#Start consul.play:
+# Start consul.play:
 
 ansible-playbook consul.play
 
@@ -18,11 +18,11 @@ Open and edit hosts (inventory) so that ansible can manage our hosts. Open and e
 
 Create a folder (roles) where all playbooks and konifugrations for our clients will be stored. We create the handlers folder, and in it the playbook, which we will sometimes refer to - to restart postgresql. Create a tasks folder, and in it a playbook that pulls and downloads all the necessary packages: vip-manager, patroni. Specify the path where you need to install the configuration for postgresql and vip-manager. Run everything you need. Creating the templates folder, where the necessary configuration will be stored for postgresql - postgrsql.yml and for vip-manager - vip-manager.yml. Let's create a vars folder where all the variables that are used in many files will be stored and can change if necessary. Thus, we automate the whole process. In our case, we will have variable ports for listening and for connecting postgresql.
 
-#Launching the playbook.yml, which specifies which hosts the folders belong to:
+# Launching the playbook.yml, which specifies which hosts the folders belong to:
 
 ansible-playbook playbook.yml
 
-#We go to one of the clients, check our leader and replica:
+# We go to one of the clients, check our leader and replica:
 
 watch patronictl list
 
@@ -30,6 +30,6 @@ watch patronictl list
 
 patronictl switchover
 
-#We are watching and waiting for the leader to change:
+# We are watching and waiting for the leader to change:
 
 watch patronictl list
