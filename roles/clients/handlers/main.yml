@@ -1,0 +1,12 @@
+---
+- name: restart vip
+  systemd:
+    name: vip-manager
+    state: restarted
+    enabled: yes
+    
+- name: restart postgres
+  systemd: 
+    name: patroni
+    state: restarted
+    enabled: yes

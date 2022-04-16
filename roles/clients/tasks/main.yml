@@ -1,0 +1,215 @@
+---
+- name: Install postgres rpm package
+  yum:
+    name:  
+      - https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+      - epel-release
+    state: present
+  tags:
+    - install pg_rpm
+
+- name: Install postgresql-14
+  yum:
+    name:  
+      - postgresql14-server
+    state: present
+  tags:
+    - install_pg14
+
+- name: Install lvm2 dependency
+  package:
+    name: lvm2
+    state: present
+  tags:
+    - install_lvm
+
+- name: Install nfs
+  ansible.builtin.yum:
+    name:
+      - nfs-utils
+    state: present
+  tags: 
+    - install_nfs
+
+
+
+
+##################################################
+- name: Create a volume group on top of /dev/sdb
+  community.general.lvg:
+    vg: pgdata
+    pvs: /dev/sdb
+  tags:
+    - vg_sdb
+    
+
+- name: Create a volume group on top of /dev/sdc
+  community.general.lvg:
+    vg: pgwal
+    pvs: /dev/sdc
+  tags:
+    - vg_sdc
+
+- name: Create a logical volume sdb
+  community.general.lvol:
+    vg: pgdata
+    lv: pgdata
+    pvs: /dev/sdb
+    size: 100%VG
+  tags:
+    - lv_sdb
+
+- name: Create a logical volume sdc
+  community.general.lvol:
+    vg: pgwal
+    lv: pgwal
+    pvs: /dev/sdc
+    size: 100%VG
+  tags:
+    - lv_sdc
+    
+    
+#######################################
+
+- name: mkfs pgdata
+  community.general.filesystem:
+    fstype: xfs
+    dev: /dev/mapper/pgdata-pgdata
+  tags: 
+    - formatting_data
+
+
+- name: mkfs pgwal
+  community.general.filesystem:
+    fstype: xfs
+    dev: /dev/mapper/pgwal-pgwal
+  tags: 
+    - formatting_wal
+
+
+#######################################
+- name: mount the /dev/sdb
+  mount:
+    path: "{{ pathtofiles }}"
+    src: /dev/mapper/pgdata-pgdata
+    fstype: xfs
+    state: mounted
+  tags: 
+    - mountdisks_data
+
+- name: mount the /dev/sdc
+  mount:
+    path: "{{ pathtoback }}"
+    src: /dev/mapper/pgwal-pgwal
+    fstype: xfs
+    state: mounted
+  tags: 
+    - mountdisks_wal
+    
+    
+###################################################
+- name: Create directory pg_data if does not exist
+  file:
+    path: "{{ pathtofiles }}"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: '0700'
+  tags:
+    - pg_data
+    
+- name: Create directory pg_wal if does not exist
+  file:
+    path: "{{ pathtoback }}"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: '0700'
+  tags:
+    - pg_wal
+
+- name: Change file ownership, group and permissions
+  ansible.builtin.file:
+    path: "{{ pathtoobsh }}"
+    owner: postgres
+    group: postgres
+    mode: '0755'
+  tags:
+    - directory
+    
+  
+######################################################
+
+- name: Install from local vip and patroni
+  shell: "yum -y localinstall /vagrant/*rpm"
+  tags: local
+
+
+######################################################
+- name: Create directory data1 if does not exist
+  file:
+    path: /var/log/patroni
+    state: directory
+    owner: postgres
+    group: postgres
+  tags:
+    - directory_patroni
+
+- name: Create directory data1 if does not exist
+  file:
+    path: /var/log/postgres
+    state: directory
+    owner: postgres
+    group: postgres
+  tags:
+    - directory_postgres
+
+- name: environment
+  template:
+    src: env
+    dest: /etc/environment
+# pg1
+
+- name: Start patroni-watchdog
+  ansible.builtin.systemd:
+    name: patroni-watchdog.service
+    state: started
+    enabled: yes
+  tags:
+    - pat_dog
+  
+- name: Start patroni
+  ansible.builtin.systemd:
+    name: patroni
+    state: started
+    enabled: yes
+  tags: 
+    - patroni
+    
+    
+######################################################
+- name: Patroni 
+  template:
+    src: postgresql.yml
+    dest: /opt/app/patroni/etc/postgresql.yml
+  tags:
+    - patroni_conf
+
+- name: Read gossip encryption key from previously boostrapped server
+  shell: 'cat /etc/consul.d/consul.hcl | grep "^encrypt = " | sed -E ''s/encrypt = "(.+)",?/\1/'' | sed ''s/^ *//;s/ *$//'''
+  register: consul_key_read
+  changed_when: false
+
+- name: Set fact gossip encryption key from existing configuration
+  set_fact:
+    consul_raw_key: "{{ consul_key_read.stdout }}"
+  when: consul_key_read.stdout != ''
+
+- name: VIP config
+  template:
+    src: vip.yml
+    dest: /etc/default/vip-manager.yml
+  notify: restart vip
+  tags:
+    - vip_conf
+

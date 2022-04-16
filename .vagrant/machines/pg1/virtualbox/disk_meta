@@ -1,0 +1,1 @@
+{"disk":[{"uuid":"0750f2ff-7472-4f08-9700-a7da6adabb4c","name":"pg1_pg_data","controller":"SATA","port":"1","device":"0"},{"uuid":"98b435c1-f6e4-4991-8f46-e8814ac710d6","name":"pg1_pg_wal","controller":"SATA","port":"2","device":"0"}],"floppy":[],"dvd":[]}

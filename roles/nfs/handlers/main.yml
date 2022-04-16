@@ -1,0 +1,10 @@
+---
+# handlers file for nfs
+- name: restart nfs
+  ansible.builtin.systemd:
+    name: nfs-utils
+    state: restarted
+    enabled: yes
+  when: "'nfs' in inventory_hostname"
+
+

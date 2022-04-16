@@ -1,0 +1,4 @@
+---
+pathtofiles: /pgsql/pg_data/
+pathtoback: /pgsql/pg_wal/
+pathtoobsh: /pgsql/

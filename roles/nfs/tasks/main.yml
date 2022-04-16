@@ -1,0 +1,173 @@
+---
+# tasks file for nfs
+- name: Install nfs
+  yum:
+    name: nfs-utils
+    state: latest
+  tags: 
+    - install_nfs
+
+- name: Create a volume group on top of /dev/sdb
+  community.general.lvg:
+    vg: nfs
+    pvs: /dev/sdb
+  tags:
+    - vg_nfs
+  when: "'nfs' in inventory_hostname"
+
+- name: Create a logical volume sdb
+  community.general.lvol:
+    vg: nfs
+    lv: lv_nfs
+    pvs: /dev/sdb
+    size: 100%VG
+  tags:
+    - lv_nfs
+  when: "'nfs' in inventory_hostname"
+
+    
+- name: mkfs 
+  community.general.filesystem:
+    fstype: xfs
+    dev: /dev/mapper/nfs-lv_nfs
+  tags: 
+    - formatting_backup
+  when: "'nfs' in inventory_hostname"
+
+- name: mount the /dev/sdb
+  mount:
+    path: "{{ pathtofiles }}"
+    src: /dev/mapper/nfs-lv_nfs
+    fstype: xfs
+    state: mounted
+  when: "'nfs' in inventory_hostname"
+  tags: 
+    - alevtina
+
+  
+
+- name: Ensure group postgres
+  ansible.builtin.group:
+    name: postgres
+    gid: 26
+  when: "'nfs' in inventory_hostname"
+  tags: kristina
+
+- name: Add the user postgres
+  user:
+    name: postgres
+    uid: 26
+    group: postgres
+  when: "'nfs' in inventory_hostname"
+
+
+- name: Create directory pg_backup if does not exist
+  file:
+    path: "{{ pathtofiles }}"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: '0700'
+  tags:
+    - pg_backup
+  when: "'nfs' in inventory_hostname"
+
+- name: public folder
+  shell: "echo '/pgsql/pg_backup 192.168.11.0/24(rw,sync,no_root_squash,no_all_squash)' > /etc/exports"
+  tags:
+    - folder
+  when: "'nfs' in inventory_hostname"
+
+- name: restart nfs
+  ansible.builtin.systemd:
+    name: nfs
+    state: restarted
+    enabled: yes
+  tags: restart_nfs
+  when: "'nfs' in inventory_hostname"
+
+
+- name: public exp
+  shell: "exportfs -a"
+  tags:
+    - folder_exp
+  when: "'nfs' in inventory_hostname"
+  ignore_errors: yes
+
+
+- name: mount before back
+  shell: "/usr/sbin/exportfs -a"
+  tags: 
+    - back
+  when: "'nfs' in inventory_hostname"
+  ignore_errors: yes
+
+
+
+- name: mount the backup
+  mount:
+    path: /pgsql/pg_backup
+    src: 192.168.11.40:/pgsql/pg_backup
+    fstype: nfs
+    state: mounted
+  tags: 
+    - mount_backup
+  when: "not 'nfs' in inventory_hostname"
+
+- name: ins pgpro_rep
+  yum: 
+    name: https://repo.postgrespro.ru/pg_probackup/keys/pg_probackup-repo-centos.noarch.rpm
+    state: present
+  tags: install_pro_rep
+  when: "not 'nfs' in inventory_hostname"
+
+- name: ins pgpro
+  yum: 
+    name: pg_probackup-14
+    state: present
+  tags: inst_pro
+  when: "not 'nfs' in inventory_hostname"
+
+- name: init
+  shell: "pg_probackup-14 init -B /pgsql/pg_backup"
+  become_user: postgres
+  become: yes
+  tags: init_pro
+  when: "'pg1' in inventory_hostname"
+
+- name: Change file ownership, group and permissions
+  ansible.builtin.file:
+    path: "{{ pathtoobsh }}"
+    owner: postgres
+    group: postgres
+    recurse: yes
+  tags:
+    - directory_init
+
+- name: instance
+  shell: "pg_probackup-14 add-instance -B /pgsql/pg_backup -D /pgsql/pg_data/14 --instance sirius"
+  become_user: postgres
+  become: yes
+  tags: 
+    - instance
+  when: "'pg2' in inventory_hostname"
+
+
+- name: create file
+  copy:
+    src: command.sql
+    dest: /command.sql
+  tags:
+    - create_pg_file
+  when: "'pg1' in inventory_hostname"
+
+- name: start
+  become: yes
+  become_user: postgres
+  shell: "psql -f /command.sql"
+  tags:
+    - start_comm
+  when: "'pg1' in inventory_hostname"
+
+
+

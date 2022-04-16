@@ -1,0 +1,4 @@
+---
+# vars file for nfs
+pathtofiles: /pgsql/pg_backup
+pathtoobsh: /pgsql
